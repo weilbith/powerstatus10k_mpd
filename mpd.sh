@@ -18,17 +18,14 @@ function getStateFormatString() {
 
   # Choose the correct color and icon depending on the status.
   if [[ "$1" == "play" ]]; then
-    formatString="${formatString}${MPD_COLOR_PLAY}}${MPD_ICON_PLAY}"
+    formatString+="${MPD_COLOR_PLAY}}${MPD_ICON_PLAY}"
 
   elif [[ "$1" == "pause" ]]; then
-    formatString="${formatString}${MPD_COLOR_PAUSE}}${MPD_ICON_PAUSE}"
-
-  else
-    formatString="${formatString}${MPD_COLOR_STOP}}${MPD_ICON_STOP}"
+    formatString+="${MPD_COLOR_PAUSE}}${MPD_ICON_PAUSE}"
   fi
 
   # Finalize the format string and return.
-  formatString="${formatString}%{F-}"
+  formatString+="%{F-}"
   echo "${formatString}"
 }
 
@@ -79,10 +76,17 @@ function initState_mpd() {
 # Implement the interface function to format the current state of the subscription.
 #
 function format_mpd() {
-  state="$(getStateFormatString "$(awk -F ':' '{print $1}' <<<"$1")")"
-  artist=$(abbreviate "$(awk -F ':' '{print $2}' <<<"$1")" "mpd")
-  title=$(abbreviate "$(awk -F ':' '{print $3}' <<<"$1")" "mpd")
+  STATE="${MPD_ICON_BASE} "
 
-  # shellcheck disable=SC2034
-  STATE="${MPD_ICON_BASE} ${state} ${artist} - ${title}"
+  local state artist title
+  state=$(awk -F ':' '{print $1}' <<<"$1")
+  artist=$(awk -F ':' '{print $2}' <<<"$1")
+  title=$(awk -F ':' '{print $3}' <<<"$1")
+
+  if [[ "$state" != "stop" ]]; then
+    STATE+=" $(getStateFormatString "$state")"
+    STATE+=" $(abbreviate "$artist" "mpd")"
+    STATE+=" - "
+    STATE+="$(abbreviate "$title" "mpd")"
+  fi
 }
