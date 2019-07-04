@@ -29,12 +29,11 @@ function getStateFormatString() {
   echo "${formatString}"
 }
 
-# Interface
-
-# Implement the interface function for the initial subscription state.
+# Starting the Python script to subscribe for changes.
+# This will setup a Python virtual environment if it does not exist already.
+# This installs or update the Python dependencies
 #
-function initState_mpd() {
-  # Start the subscribing python script.
+function startSubscriber() {
   source_directory=$(dirname "${BASH_SOURCE[0]}")
   virtual_environment="$source_directory/venv"
 
@@ -43,32 +42,65 @@ function initState_mpd() {
   source "$virtual_environment/bin/activate"
   pip install -r "$source_directory/requirements.txt"
   python3 "$source_directory/mpd_subscriber.py" &
+}
 
-  # Get current state if possible.
-  if command -v mpc >/dev/null &&
-    mpc >/dev/null 2>&1 &&
-    [[ $(mpc | wc -l) -gt 1 ]]; then
-    artist=$(mpc --format "%artist%" | head -n1)
-    title=$(mpc --format "%title%" | head -n1)
-
-    case "$(mpc | sed -n 2p)" in
-    "[playing]"*)
-      state="play"
-      ;;
-
-    "[paused]"*)
-      state="pause"
-      ;;
-
-    *)
-      state="stop"
-      ;;
-    esac
-
-    format_mpd "${state}:${artist}:${title}"
+# Check if the MPD daemon is running and active.
+# Do not work it the MPC tool is not installed.
+#
+# Returns:
+#   1 if active else 0
+#
+function isMpdActive() {
+  if command -v mpc >/dev/null && # MPC is installed
+    mpc >/dev/null 2>&1 && # MPD daemon is running
+    [[ $(mpc | wc -l) -gt 1 ]]; then # MPD is active
+    return 0
 
   else
-    # Only show the icon.
+    return 1
+  fi
+}
+
+# Get the initial state of the player without an event.
+# Do not work it the MPC tool is not installed.
+#
+# Returns:
+#   MPD state in format as form subscriber
+#
+function getInitialState() {
+  local state artist title
+
+  case "$(mpc | sed -n 2p)" in
+  "[playing]"*)
+    state="play"
+    ;;
+
+  "[paused]"*)
+    state="pause"
+    ;;
+
+  *)
+    state="stop"
+    ;;
+  esac
+
+  artist=$(mpc --format "%artist%" | head -n1)
+  title=$(mpc --format "%title%" | head -n1)
+
+  echo "${state}:${artist}:${title}"
+}
+
+# Interface
+
+# Implement the interface function for the initial subscription state.
+#
+function initState_mpd() {
+  startSubscriber
+
+  if isMpdActive; then
+    format_mpd "$(getInitialState)"
+
+  else
     STATE="${MPD_ICON_BASE}"
   fi
 }
